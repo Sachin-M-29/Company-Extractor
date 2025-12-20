@@ -1,0 +1,16 @@
+{
+  "buildCommand": "cd nextjs-ui && npm run build",
+  "outputDirectory": "nextjs-ui/.next",
+  "framework": "nextjs",
+  "env": {
+    "PYTHON_API": "@python_api_url",
+    "NEXT_PUBLIC_PYTHON_API": "@next_public_python_api_url"
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/nextjs-ui",
+      "permanent": false
+    }
+  ]
+}
