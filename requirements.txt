@@ -5,8 +5,7 @@ streamlit==1.30.0
 Flask==3.0.0
 Flask-CORS==4.0.0
 
-# LLM & ML
-ollama==0.0.15
+# LLM & ML (server-safe subset; remove ollama which has no PyPI wheels on Render)
 transformers==4.36.2
 torch==2.1.2
 bitsandbytes==0.42.0
