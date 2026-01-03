@@ -18,7 +18,7 @@ from scrapers.scraper import WebScraper, chunk_text
 from utils.resolve import resolve_company_website
 from utils.heuristics import extract_all as heuristic_extract
 from utils.enrich import enrich_company_details
-from llm.cli_extractor import CLIExtractor
+from llm.hf_extractor import HFExtractor
 from database.db import CompanyDatabase
 
 app = Flask(__name__)
@@ -26,6 +26,12 @@ CORS(app)
 
 # Database
 db = CompanyDatabase()
+
+# Initialize HF Extractor (Mistral 7B)
+extractor = HFExtractor(
+    model_name="mistralai/Mistral-7B-Instruct-v0.1",
+    use_gpu=True  # Uses GPU if available
+)
 
 
 @app.route('/api/health', methods=['GET'])
@@ -90,8 +96,7 @@ def extract_single():
             return jsonify({'error': 'Failed to scrape website content'}), 400
 
         print(f"[API] Scraped {len(scraped_text)} characters, extracting with LLM...")
-        # Extract with LLM
-        extractor = CLIExtractor(model='mistral:7b-instruct-q4_0')
+        # Extract with LLM using global extractor (Mistral 7B via HF)
         chunks = chunk_text(scraped_text, chunk_size=500, overlap=50)
         text_to_extract = chunks[0] if chunks else scraped_text
 
@@ -180,7 +185,7 @@ def batch_extract():
             """Process single URL"""
             try:
                 scraper = WebScraper(timeout=min(timeout, 5) if fast_mode else timeout)
-                extractor = CLIExtractor(model='mistral:7b-instruct-q4_0')
+                # Use global extractor (Mistral 7B via HF)
 
                 if scrape_method == 'Static HTML Only':
                     scraped_text = scraper.scrape_static_html(url)

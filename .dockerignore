@@ -1,0 +1,74 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Node.js (frontend)
+nextjs-ui/
+node_modules/
+
+# Documentation
+*.md
+!README.md
+
+# Database (SQLite - will be created in container)
+*.db
+*.db-journal
+
+# Logs
+*.log
+
+# Test files
+tests/
+test_*.py
+*_test.py
+
+# Deployment files
+DEPLOYMENT.md
+RENDER_DEPLOYMENT.md
+AZURE_DEPLOYMENT.md
+AZURE_STUDENT_DEPLOYMENT.md
+ORACLE_CLOUD_FREE.md
+LIVE_HOSTING_SETUP.md
