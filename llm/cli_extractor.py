@@ -1,33 +1,46 @@
 """
-CLI-based LLM extractor for when HTTP API has issues
-Uses subprocess to call ollama run directly
+Transformers-based LLM extractor using Hugging Face models
+Uses Mistral 7B via Transformers library
+Compatible with Hugging Face Spaces deployment
 """
 
 import json
-import subprocess
 import logging
 from typing import Optional, Dict, Any
 import re
-import os
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 logger = logging.getLogger(__name__)
 
 
 class CLIExtractor:
-    """Extractor using Ollama CLI instead of HTTP API"""
+    """Extractor using Transformers (Mistral 7B)"""
     
-    def __init__(self, model: str = "mistral:7b-instruct-q4_0", gpu_device: int = 0):
-        self.model = model
+    def __init__(self, model: str = "mistralai/Mistral-7B-Instruct-v0.1", gpu_device: int = 0):
+        """Initialize Mistral model via Transformers"""
+        self.model_name = model
         self.gpu_device = gpu_device
+        self.device = f"cuda:{gpu_device}" if torch.cuda.is_available() else "cpu"
         
-        # Set GPU environment for Ollama
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_device)
-        os.environ['OLLAMA_NUM_GPU'] = '1'
+        logger.info(f"Loading model {model} on device {self.device}")
         
-        logger.info(f"Initialized CLI Extractor with model: {model}, GPU: {gpu_device}")
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(model, trust_remote_code=True)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                device_map=self.device,
+                trust_remote_code=True,
+                low_cpu_mem_usage=True
+            )
+            logger.info(f"Model loaded successfully on {self.device}")
+        except Exception as e:
+            logger.error(f"Failed to load model: {e}")
+            raise
     
     def extract_from_text(self, text: str, url: str = "") -> Optional[Dict[str, Any]]:
-        """Extract using ollama run command"""
+        """Extract using Transformers model"""
         try:
             # Build prompt (limit text to 4000 chars for better extraction)
             max_text_len = 4000
@@ -71,29 +84,26 @@ Return ONLY valid JSON wrapped in ```json code fences with these exact fields:
 
 EXTRACT ONLY WHAT YOU SEE. Return JSON only."""
 
-            logger.info(f"Running CLI extraction with {self.model} on GPU {self.gpu_device}")
+            logger.info(f"Running Transformers extraction on {self.device}")
             
-            # Set environment for GPU acceleration
-            env = os.environ.copy()
-            env['CUDA_VISIBLE_DEVICES'] = str(self.gpu_device)
-            env['OLLAMA_NUM_GPU'] = '1'
+            # Tokenize input
+            inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
             
-            # Call ollama via subprocess with GPU env
-            result = subprocess.run(
-                ["ollama", "run", self.model, prompt],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="ignore",
-                timeout=300,  # 5 minutes for enriched runs with GPU
-                env=env
-            )
+            # Generate response
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    inputs["input_ids"],
+                    max_length=2000,
+                    temperature=0.3,
+                    top_p=0.9,
+                    do_sample=True,
+                    pad_token_id=self.tokenizer.eos_token_id
+                )
             
-            if result.returncode != 0:
-                logger.error(f"CLI command failed: {result.stderr}")
-                return None
-            
-            response = result.stdout.strip()
+            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            # Remove the prompt from the output
+            if prompt in response:
+                response = response.split(prompt)[-1].strip()
             
             # Parse JSON from response
             # Sometimes model wraps in ```json blocks
@@ -121,34 +131,31 @@ EXTRACT ONLY WHAT YOU SEE. Return JSON only."""
             try:
                 data = json.loads(json_text)
             except json.JSONDecodeError:
-                # Attempt light sanitization: normalize quotes, escape backslashes, remove trailing commas
+                # Attempt light sanitization
                 s = json_text.strip()
-                # Clip to outermost {}
-                start = s.find('{'); end = s.rfind('}')
+                start = s.find('{')
+                end = s.rfind('}')
                 if start != -1 and end > start:
                     s = s[start:end+1]
-                # Normalize curly quotes
-                s = s.replace('“','"').replace('”','"').replace('’',"'")
-                # Remove trailing commas before } or ]
+                s = s.replace('"', '"').replace('"', '"').replace(''', "'")
                 s = re.sub(r",\s*([}\]])", r"\1", s)
-                # If single quotes dominate, switch to double quotes
                 if s.count('"') < s.count("'"):
                     s = s.replace("'", '"')
-                # Escape backslashes
                 s = s.replace('\\', r'\\')
                 data = json.loads(s)
+            
             logger.info("Successfully extracted company information")
             return data
             
-        except subprocess.TimeoutExpired:
-            logger.error("CLI extraction timed out")
+        except torch.cuda.OutOfMemoryError:
+            logger.error("GPU out of memory during extraction")
             return None
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON: {e}")
-            logger.debug(f"Response was: {response[:500]}")
+            logger.debug(f"Response was: {response[:500] if 'response' in locals() else 'No response'}")
             return None
         except Exception as e:
-            logger.error(f"Error during CLI extraction: {e}")
+            logger.error(f"Error during Transformers extraction: {e}")
             return None
 
 
