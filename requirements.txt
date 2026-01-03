@@ -5,7 +5,12 @@ streamlit==1.30.0
 Flask==3.0.0
 Flask-CORS==4.0.0
 
-# LLM & ML (server-safe subset; remove ollama which has no PyPI wheels on Render)
+# API Framework for HF Spaces
+fastapi==0.108.0
+uvicorn==0.25.0
+pydantic==2.5.2
+
+# LLM & ML (server-safe subset; using Transformers instead of Ollama)
 transformers==4.36.2
 torch==2.1.2
 bitsandbytes==0.42.0
@@ -20,4 +25,3 @@ sqlalchemy==2.0.23
 # Additional utilities
 python-dotenv==1.0.0
 lxml==4.9.3
-pydantic==2.5.2
